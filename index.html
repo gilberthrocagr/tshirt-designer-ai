@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Apparel Design Studio · Gilberth Roca</title>
+<meta name="description" content="Design apparel with your logo, text and drawing, view it in 360°, try it on with the camera and create logos with AI.">
+<meta name="theme-color" content="#06090F">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%234E7BF0%22/%3E%3Cstop%20offset%3D%22.55%22%20stop-color%3D%22%238B5CF0%22/%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23F2963F%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2214%22%20fill%3D%22url%28%23g%29%22/%3E%3Cpath%20d%3D%22M24%2020%2012%2032l12%2012M40%2020l12%2012-12%2012M35%2016l-6%2032%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div class="topline" aria-hidden="true"></div>
+<header class="nav"><div class="wrap">
+  <a class="brand ib" href="https://www.gilberthroca.com/" title="gilberthroca.com"><span class="dot"></span><span><b>AI Design Studio</b><small>Gilberth Roca</small></span></a>
+  <div class="lang-sw" role="group" aria-label="Language"><button type="button" data-setlang="en" class="on" aria-pressed="true">EN</button><button type="button" data-setlang="es" aria-pressed="false">ES</button></div>
+</div></header>
+<main id="ch1">
+<section id="tryon"><div class="wrap">
+  <div class="eyebrow"><span class="ix">✦</span>AI apparel design studio</div>
+  <h2>Try it on: your design, on you</h2>
+  <p class="lead">Design a shirt, sweatshirt or hoodie with your logo, text and drawing. Turn it 360°, see it on a model or on yourself with the camera, create a logo with AI and order the right size.</p>
+  <div class="to mt" id="design">
+    <div class="to-ctl to-design">
+      <div class="to-step"><b>1</b><span>Pick your garment</span></div>
+      <div class="to-seg" id="toType" role="group" aria-label="Garment">
+        <button type="button" data-type="tee" class="on">T-shirt</button><button type="button" data-type="sweat">Sweatshirt</button><button type="button" data-type="hoodie">Hoodie</button>
+      </div>
+      <div class="to-step"><b>2</b><span>Pick a color</span></div>
+      <div class="to-colors" id="toColors" role="group" aria-label="Garment color"></div>
+      <div class="to-step"><b>3</b><span>Add your logo</span></div>
+      <div class="to-layers" id="toLayers" role="group" aria-label="Your logos"></div>
+      <div class="to-print"><span>Print on</span><div class="to-seg to-seg-sm" id="toSide" role="group" aria-label="Print on"><button type="button" data-side="front" class="on">Front</button><button type="button" data-side="back">Back</button></div></div>
+      <div class="to-logos" id="toLogos" role="group" aria-label="Sample logos"></div>
+      <div class="to-row">
+        <label class="ghost-btn to-up">⬆ Upload your logo<input type="file" id="toLogo" accept="image/*" hidden></label>
+        <button type="button" class="ghost-btn to-up to-ai-btn" id="toAiLogo" aria-expanded="false">✨ Create a logo with AI</button>
+        <input id="toText" maxlength="18" placeholder="Your brand, team or name" aria-label="Logo text">
+      </div>
+      <div class="to-aibox" id="toAiBox" hidden>
+        <textarea id="toAiDesc" maxlength="300" rows="2" placeholder="Describe your logo: name, style, colors… e.g. MIAMI TACOS, retro, orange and black, a sun" aria-label="Describe your logo"></textarea>
+        <div class="to-airow"><button type="button" class="ghost-btn to-aigo" id="toAiGo">Generate</button><small id="toAiMsg">No logo yet? The AI draws one for you and it goes on the shirt.</small></div>
+      </div>
+      <div class="to-type" id="toType2">
+        <div class="to-fonts" id="toFonts" role="group" aria-label="Typeface"></div>
+        <div class="to-tcolors" id="toTColors" role="group" aria-label="Text color"></div>
+      </div>
+      <div class="to-tools">
+        <button type="button" class="ghost-btn" id="toBrush" aria-pressed="false">🖌 Draw</button>
+        <button type="button" class="ghost-btn" id="toPick">💧 Pick a color</button>
+        <span class="to-picked" id="toPicked" hidden title="Picked color"></span>
+      </div>
+      <div class="to-brushbar" id="toBrushbar" hidden>
+        <div class="to-bsizes" id="toBSizes" role="group" aria-label="Brush size"><button type="button" data-b="5">S</button><button type="button" data-b="12" class="on">M</button><button type="button" data-b="26">L</button></div>
+        <div class="to-tcolors" id="toBColors" role="group" aria-label="Brush color"></div>
+        <button type="button" class="ghost-btn to-clear" id="toClearDraw">Clear drawing</button>
+        <small>Draw on the shirt, on the front or the back.</small>
+      </div>
+      <label class="to-size"><span>Logo size</span><input type="range" id="toSize" min="0.18" max="0.62" step="0.01" value="0.36"></label>
+      <div class="to-place"><span>Logo position</span>
+        <div class="to-seg to-seg-sm" id="toPlace" role="group" aria-label="Logo position"><button type="button" data-place="center" class="on">Center</button><button type="button" data-place="left">Left chest</button><button type="button" data-place="right">Right chest</button></div>
+        <div class="to-nudge" id="toNudge" role="group" aria-label="Move the logo"><button type="button" data-nudge="up" aria-label="Move up">↑</button><button type="button" data-nudge="down" aria-label="Move down">↓</button><button type="button" data-nudge="left" aria-label="Move left">←</button><button type="button" data-nudge="right" aria-label="Move right">→</button></div>
+      </div>
+      <p class="to-tip">PNG or SVG with a transparent background works best.</p>
+      <p class="to-code"><button type="button" class="ghost-btn" id="toCode">&lt;/&gt; See the code of this tool</button><small>Reviewed by an agent, no errors</small></p>
+    </div>
+    <div class="to-center">
+      <div class="to-tabs" role="tablist" aria-label="Preview">
+        <button type="button" role="tab" data-pv="360" class="on">🔄 360°</button><button type="button" role="tab" data-pv="model">👤 On a model</button><button type="button" role="tab" data-pv="me">📷 On you</button>
+      </div>
+      <div class="to-stage">
+        <canvas id="toCanvas" aria-label="Garment preview"></canvas>
+        <div class="to-dims" id="toDims" hidden></div>
+        <div class="to-views" id="toViews" hidden><button type="button" data-view="0">Front</button><button type="button" data-view="1">Side</button><button type="button" data-view="2">Back</button></div>
+        <video id="toVideo" playsinline muted hidden></video>
+        <div class="to-me" id="toMe" hidden>
+          <h3>See it on you</h3>
+          <p>Point the camera at your shirt and we recolor it live, with your logo. Or use a photo.</p>
+          <div class="to-row"><button type="button" class="btn" data-to="cam">📷 Use my camera</button><button type="button" class="ghost-btn" data-to="photo">🖼️ Upload a photo</button></div>
+          <small>Your camera and photo stay on your device. Only if you ask for an AI photo is it sent to create it, and it is not stored.</small>
+        </div>
+        <div class="to-msg" id="toMsg" hidden></div>
+        <div class="to-count" id="toCount" hidden></div>
+        <div class="to-ai" id="toAiResult" hidden><img alt="The garment, created by AI"><p>Created by AI from your photo and your design.</p></div>
+        <div class="to-actions">
+          <button type="button" class="ghost-btn" id="toFlip" hidden>🔄 Switch camera</button>
+          <button type="button" class="ghost-btn" id="toTimer" hidden>⏱ Timer: off</button>
+          <button type="button" class="btn" id="toAi" hidden>✨ Create a realistic photo with AI</button>
+          <button type="button" class="ghost-btn" id="toSave" hidden>⬇ Save the photo</button>
+          <input type="file" id="toPhoto" accept="image/*" hidden>
+        </div>
+      </div>
+    </div>
+    <div class="to-side">
+      <div class="to-ctl to-buy" id="toBuy">
+        <small class="to-concept">Concept · example prices</small>
+        <div class="to-price"><b id="toPrice">$33.59</b><span id="toEach">each</span></div>
+        <div class="to-buyrow">
+          <label><span>Size</span><select id="toOrderSize" aria-label="Order size"></select></label>
+          <div class="to-qty" role="group" aria-label="Quantity"><button type="button" id="toMinus" aria-label="Less">−</button><input id="toQty" type="number" min="1" max="999" value="1" inputmode="numeric" aria-label="Quantity"><button type="button" id="toPlus" aria-label="More">+</button></div>
+        </div>
+        <p class="to-suggest" id="toSuggest"></p>
+        <p class="to-deal" id="toDeal"></p>
+        <button type="button" class="btn to-cta" id="toCart">Add to cart — $33.59</button>
+        <p class="to-ship" id="toShip"></p>
+        <p class="to-trust">✓ No minimums · ✓ No setup fees · ✓ Free shipping from $29 · ✓ Your photo stays on your device</p>
+      </div>
+      <div class="to-ctl to-ctl-model">
+        <div class="to-step"><b>4</b><span>The model</span></div>
+        <div class="to-model" id="toModel">
+          <div class="to-seg" id="toWho" role="group" aria-label="Model">
+            <button type="button" data-who="woman" class="on">Woman</button><button type="button" data-who="man">Man</button><button type="button" data-who="girl">Girl</button><button type="button" data-who="boy">Boy</button>
+          </div>
+          <div class="to-fields">
+            <label><span>Age</span><input type="number" id="toAge" min="2" max="90" value="30" inputmode="numeric"></label>
+            <label><span>Height</span><input type="number" id="toHeight" min="30" max="220" value="65" inputmode="decimal"><select id="toHUnit" aria-label="Height unit"><option value="in">in</option><option value="cm">cm</option></select></label>
+            <label><span>Weight</span><input type="number" id="toWeight" min="10" max="485" value="137" inputmode="decimal"><select id="toWUnit" aria-label="Weight unit"><option value="lb">lb</option><option value="kg">kg</option></select></label>
+          </div>
+          <div class="to-skin-row"><span>Skin tone</span><div class="to-skins" id="toSkin" role="group" aria-label="Skin tone"></div></div>
+          <p class="to-skin-note">The model's own skin tone. More tones coming soon.</p>
+          <label class="to-check"><input type="checkbox" id="toWithLogo" checked> With the logo</label>
+          <p class="to-calc" id="toCalc"></p>
+          <button type="button" class="ghost-btn" id="toModelBtn">✨ Realistic AI photo of this model</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="to-mbar" id="toMbar" hidden><span><b id="toMPrice">$33.59</b><small id="toMSize"></small></span><button type="button" class="btn" id="toMCart">Add to cart</button></div>
+  <div class="to-toast" id="toToast" role="status" hidden></div>
+</div></section>
+</main>
+<script src="js/i18n-es.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
