@@ -1,16 +1,30 @@
-// gilberthroca.com — the static site plus one small server function.
+// AI Apparel Design Studio: the Cloudflare Pages worker ("advanced mode": this file at the root of the deployed folder).
 //
-// Everything is served from the uploaded files (env.ASSETS) except POST /api/tryon:
-// it receives a visitor's photo and the garment they designed on /work, and asks an
-// image model to dress the person (the browser reads the image out of the model's answer). The API key lives only here, as a Cloudflare secret
-// (GEMINI_API_KEY); it never reaches the browser. Photos are not stored.
+// Every request is served from the deployed static files (env.ASSETS) except POST /api/tryon, which asks a Gemini image
+// model for one picture and passes Google's JSON answer straight back (the page takes the image out of it). The request
+// body's "mode" says what to make:
+//   (none)     the visitor's photo + the flat garment they designed -> the same photo, the person wearing the garment
+//   'model'    the flat garment + a model described by who, age, height, weight, skin, build and size -> a catalogue photo
+//   'logo'     a short description -> a flat logo on white
+//   'product'  a plain garment on an invisible mannequin, from one angle (the 360° view's base photos): owner only
+//
+// Settings (Cloudflare Pages > Settings > Variables and Secrets):
+//   GEMINI_API_KEY   secret, required. It stays here: the browser never sees it.
+//   ALLOWED_ORIGINS  optional: comma-separated origins whose pages may call /api/tryon (default: DEFAULT_ORIGINS).
+//   ADMIN_TOKEN      optional secret: 'product' mode works only when it is set and sent in the X-Admin-Token header.
+//   TRYON_MODEL      optional: another Gemini image model id.
+// Nothing is stored here. The photos and descriptions go to Google's Gemini API to make the picture.
 
 const MODEL = 'gemini-nano-banana-2.1';      // Nano Banana 2.1: Google's current image model (~0.034 $ a photo)
 const FALLBACK = 'gemini-3.1-flash-image';   // if the first one is not available to this key
 const MAX_BODY = 8 * 1024 * 1024;           // two images, base64
-const PER_IP_PER_HOUR = 15;                  // best effort, per server instance
-const LOGOS_PER_IP_PER_HOUR = 5;             // "Create a logo with AI": its own, smaller limit
-const ALLOWED = ['https://gilberthroca.com', 'https://www.gilberthroca.com'];
+const DEFAULT_ORIGINS = ['https://gilberthroca.com', 'https://www.gilberthroca.com'];
+// Per-IP limits, best effort only. They live in the memory of one worker instance; Cloudflare runs many instances and
+// recycles them, so a client on another instance or another IP starts again from zero. They stop a browser that loops by
+// mistake, not someone set on spending the key's budget: for that, set a daily quota and a budget alert on the key in
+// Google Cloud (README, "Cost protection").
+const PER_IP_PER_HOUR = 15;                  // every request to /api/tryon, logos included
+const LOGOS_PER_IP_PER_HOUR = 5;             // "Create a logo with AI" also has its own, smaller limit
 const seen = new Map(), seenLogos = new Map();
 // "See it on a model": what the page may ask for (anything else is refused)
 const SKINS = { 'very-light': 'very fair, white', light: 'light', medium: 'medium', olive: 'olive', brown: 'brown', deep: 'deep brown', black: 'very dark, black' };
@@ -32,6 +46,20 @@ function json(status, body) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 }
 
+function allowedOrigins(env) {
+  const list = String(env.ALLOWED_ORIGINS || '').split(',').map((o) => o.trim().replace(/\/+$/, '')).filter(Boolean);
+  return list.length ? list : DEFAULT_ORIGINS;
+}
+
+// 'product' mode is for the site owner: ADMIN_TOKEN must be set and the request must carry the same value in X-Admin-Token
+function isAdmin(request, env) {
+  const want = env.ADMIN_TOKEN, got = request.headers.get('X-Admin-Token');
+  if (typeof want !== 'string' || !want || typeof got !== 'string' || got.length !== want.length) return false;
+  let diff = 0;
+  for (let i = 0; i < want.length; i++) diff |= want.charCodeAt(i) ^ got.charCodeAt(i);  // compared in constant time
+  return diff === 0;
+}
+
 function tooMany(ip, map = seen, max = PER_IP_PER_HOUR) {
   const now = Date.now(), hour = 3600e3;
   const list = (map.get(ip) || []).filter((t) => now - t < hour);
@@ -43,7 +71,9 @@ function tooMany(ip, map = seen, max = PER_IP_PER_HOUR) {
 async function tryon(request, env) {
   if (request.method !== 'POST') return json(405, { error: 'method' });
   const origin = request.headers.get('Origin') || '';
-  if (!ALLOWED.includes(origin)) return json(403, { error: 'origin' });  // browsers always send it on a POST; tools without it are refused
+  // Browsers always send Origin on a POST, so other websites' pages cannot use this endpoint. A script can send any Origin
+  // it likes: this is not authentication (see the limits above).
+  if (!allowedOrigins(env).includes(origin)) return json(403, { error: 'origin' });
   if (!env.GEMINI_API_KEY) return json(503, { error: 'not-configured' });
   if (Number(request.headers.get('Content-Length') || 0) > MAX_BODY) return json(413, { error: 'too-large' });
   if (tooMany(request.headers.get('CF-Connecting-IP') || 'unknown')) return json(429, { error: 'rate-limited' });
@@ -64,6 +94,7 @@ async function tryon(request, env) {
   try { input = JSON.parse(raw); } catch { return json(400, { error: 'bad-json' }); }
   if (!input || typeof input !== 'object') return json(400, { error: 'bad-json' });
   if (input.mode === 'logo') return logo(input, env, request);
+  if (input.mode === 'product' && !isAdmin(request, env)) return json(403, { error: 'admin-only' });
   const garment = /^data:image\/png;base64,/.exec(input.garment || '');
   if (!garment && input.mode !== 'product') return json(400, { error: 'bad-images' });
   const kind = ['t-shirt', 'crewneck sweatshirt', 'hoodie'].includes(input.garmentType) ? input.garmentType : 't-shirt';
@@ -85,7 +116,7 @@ async function tryon(request, env) {
   let parts;
   if (input.mode === 'product') {
     // The 360° view's base photos: a plain white garment on an invisible mannequin, from one angle, on a flat grey
-    // background (so the page can cut it out and recolour it). Made once by the site owner, not by visitors.
+    // background (so the page can cut it out and recolour it). Made once by the site owner, not by visitors (isAdmin).
     const angle = { front: 'straight-on front view', threequarter: 'three-quarter view, turned 45 degrees to its left', side: 'exact side profile view, turned 90 degrees', back: 'straight-on back view' }[input.angle];
     if (!angle) return json(400, { error: 'bad-angle' });
     const prompt =
