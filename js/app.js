@@ -51,6 +51,7 @@
     var VISION = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
     var MODEL = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
     var COLORS = ['#F5F5F2', '#1E3A8A'];  // white and blue: both are real photos on the models (no colour painted over)
+    var COLOR_LABELS = { '#F5F5F2': 'White', '#1E3A8A': 'Navy blue' };  // what a screen reader says for each swatch
     // Garments drawn in a 200 × 220 box; the shoulder line sits at y = 24, between x = 35 and x = 165.
     var SHAPES = {
       tee: { body: 'M70 12 Q100 30 130 12 L165 24 L198 64 L172 86 L158 74 L158 212 Q100 220 42 212 L42 74 L28 86 L2 64 L35 24 Z', chest: [52, 50, 96, 120] },
@@ -78,7 +79,7 @@
     // Typefaces for the lettering (Google Fonts, loaded when the tool starts) and colours for it
     var FONTS = [['Archivo', "900 120px Archivo, 'Arial Black', Arial"], ['Bebas Neue', "400 132px 'Bebas Neue', Impact, sans-serif"], ['Oswald', "700 116px Oswald, Impact, sans-serif"],
       ['Playfair Display', "900 112px 'Playfair Display', Georgia, serif"], ['Pacifico', "400 104px Pacifico, cursive"], ['Permanent Marker', "400 108px 'Permanent Marker', cursive"], ['Courier Prime', "700 104px 'Courier Prime', 'Courier New', monospace"]];
-    var TCOLORS = [['auto', ''], ['white', '#FFFFFF'], ['black', '#111111'], ['orange', '#F2963F'], ['royal', '#2F5BEA'], ['red', '#D62828'], ['gold', '#E8B931'], ['green', '#1F8A4C']];
+    var TCOLORS = [['auto', ''], ['white', '#FFFFFF', 'White'], ['black', '#111111', 'Black'], ['orange', '#F2963F', 'Orange'], ['royal', '#2F5BEA', 'Royal blue'], ['red', '#D62828', 'Red'], ['gold', '#E8B931', 'Gold'], ['green', '#1F8A4C', 'Green']];  // key, colour, label
     (function () {
       var l = document.createElement('link'); l.rel = 'stylesheet';
       l.href = 'https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@700&family=Playfair+Display:wght@900&family=Pacifico&family=Permanent+Marker&family=Courier+Prime:wght@700&display=swap';
@@ -473,11 +474,11 @@
 
     // ---------- See it on a model: who, age, height, weight and skin tone; the page works out build and size ----------
     // from white to black, lightest to darkest
-    var SKINS = [['very-light', '#F7E1D3'], ['light', '#E9BC97'], ['medium', '#C99268'], ['olive', '#A9784C'], ['brown', '#7B4B2A'], ['deep', '#4B2C18'], ['black', '#2A170D']];
+    var SKINS = [['very-light', '#F7E1D3', 'Very fair'], ['light', '#E9BC97', 'Light'], ['medium', '#C99268', 'Medium'], ['olive', '#A9784C', 'Olive'], ['brown', '#7B4B2A', 'Brown'], ['deep', '#4B2C18', 'Deep brown'], ['black', '#2A170D', 'Very dark']];  // key, colour, label
     var model = { who: 'woman', skin: 'natural' }, CHILD = { girl: 1, boy: 1 }, modelBusy = false;  // one model photo at a time
     var skinsEl = document.getElementById('toSkin');
     SKINS.forEach(function (s) {
-      var b = document.createElement('button'); b.type = 'button'; b.style.setProperty('--c', s[1]); b.dataset.skin = s[0]; b.setAttribute('aria-label', s[0]); if (s[0] === model.skin) b.className = 'on';
+      var b = document.createElement('button'); b.type = 'button'; b.style.setProperty('--c', s[1]); b.dataset.skin = s[0]; b.setAttribute('aria-label', s[2]); if (s[0] === model.skin) b.className = 'on';
       b.onclick = function () { if (b.disabled) return; model.skin = s[0] === model.natural ? 'natural' : s[0]; markSkins(); drawAvatar(); };
       skinsEl.appendChild(b);
     });
@@ -834,7 +835,7 @@
 
     // Controls
     var colors = document.getElementById('toColors');
-    COLORS.forEach(function (c) { var b = document.createElement('button'); b.type = 'button'; b.style.setProperty('--c', c); b.setAttribute('aria-label', c); if (c === st.color) b.className = 'on'; b.onclick = function () { st.color = c; colors.querySelectorAll('button').forEach(function (x) { x.classList.toggle('on', x === b); }); redraw(); }; colors.appendChild(b); });
+    COLORS.forEach(function (c) { var b = document.createElement('button'); b.type = 'button'; b.style.setProperty('--c', c); b.setAttribute('aria-label', COLOR_LABELS[c] || c); if (c === st.color) b.className = 'on'; b.onclick = function () { st.color = c; colors.querySelectorAll('button').forEach(function (x) { x.classList.toggle('on', x === b); }); redraw(); }; colors.appendChild(b); });
     var logos = document.getElementById('toLogos'), sampleImgs = [];
     SAMPLES.forEach(function (svg, k) {
       var im = svgImage(svg), b = document.createElement('button'); b.type = 'button'; b._img = im; b.setAttribute('aria-label', 'Sample logo ' + (k + 1)); b.appendChild(svgImage(svg)); sampleImgs.push(im);
@@ -905,7 +906,7 @@
     }
     var typeEl = document.getElementById('toType2'), fontsEl = document.getElementById('toFonts'), tcolEl = document.getElementById('toTColors');
     FONTS.forEach(function (f) { var b = document.createElement('button'); b.type = 'button'; b.textContent = 'Aa'; b.style.fontFamily = "'" + f[0] + "'"; b.title = f[0]; b.setAttribute('aria-label', f[0]); b.onclick = function () { st.font = f[0]; syncType(); redraw(); }; fontsEl.appendChild(b); });
-    TCOLORS.forEach(function (c) { var b = document.createElement('button'); b.type = 'button'; if (c[0] === 'auto') { b.className = 'auto'; b.title = tr('Automatic'); } else b.style.setProperty('--c', c[1]); b.setAttribute('aria-label', c[0] === 'auto' ? tr('Automatic') : c[0]); b.dataset.c = c[0]; b.onclick = function () { st.tcolor = c[0]; syncType(); redraw(); }; tcolEl.appendChild(b); });
+    TCOLORS.forEach(function (c) { var b = document.createElement('button'); b.type = 'button'; if (c[0] === 'auto') { b.className = 'auto'; b.title = tr('Automatic'); } else b.style.setProperty('--c', c[1]); b.setAttribute('aria-label', c[0] === 'auto' ? tr('Automatic') : c[2]); b.dataset.c = c[0]; b.onclick = function () { st.tcolor = c[0]; syncType(); redraw(); }; tcolEl.appendChild(b); });
     function syncType() {
       typeEl.hidden = !isText(st.layers[st.active]);
       fontsEl.querySelectorAll('button').forEach(function (b) { b.classList.toggle('on', b.title === (st.font || 'Archivo')); });
@@ -1095,6 +1096,7 @@
       var d = sizeDims(), es = LANG === 'es', cm = function (v) { return Math.round(v * 2.54); };
       dimsEl.textContent = d.size + ' · ' + (es ? 'pecho ' : 'chest ') + d.chest + ' in (' + cm(d.chest) + ' cm) · ' + (es ? 'largo ' : 'length ') + d.length + ' in (' + cm(d.length) + ' cm)';
     }
+    onLang.push(showDims);
     // the 360° photos' prepared maps: R = fabric light (204 = average), G = garment mask
     // An iPhone gives a page a limited amount of canvas memory, and past it Safari draws the canvases in pieces or not at
     // all. So each layer keeps only the garment's box (no empty background), the work canvas is released at once, and
@@ -1187,7 +1189,7 @@
     function brushColors() {
       bcolEl.innerHTML = '';
       var list = TCOLORS.filter(function (c) { return c[0] !== 'auto' && c[1]; });
-      list.forEach(function (c) { var b = document.createElement('button'); b.type = 'button'; b.style.setProperty('--c', c[1]); b.setAttribute('aria-label', c[0]); b.classList.toggle('on', c[1].toLowerCase() === brush.color.toLowerCase()); b.onclick = function () { brush.color = c[1]; brushColors(); }; bcolEl.appendChild(b); });
+      list.forEach(function (c) { var b = document.createElement('button'); b.type = 'button'; b.style.setProperty('--c', c[1]); b.setAttribute('aria-label', c[2] || 'Picked color'); b.classList.toggle('on', c[1].toLowerCase() === brush.color.toLowerCase()); b.onclick = function () { brush.color = c[1]; brushColors(); }; bcolEl.appendChild(b); });
     }
     brushColors();
     document.getElementById('toBSizes').onclick = function (e) { var b = e.target.closest('[data-b]'); if (!b) return; brush.size = +b.getAttribute('data-b'); this.querySelectorAll('button').forEach(function (x) { x.classList.toggle('on', x === b); }); };

@@ -656,6 +656,9 @@ body{overflow-x:clip}
 .to-count[hidden]{display:none}
 
 .to-code{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin:14px 0 0}.to-code small{color:var(--muted);font-size:13px}
+.to-code a.ghost-btn{text-decoration:none;text-align:center}
+/* the tool's title is the page's h1, styled like the section h2 it replaced */
+h1.to-title{font-size:clamp(28px,4vw,40px);font-variation-settings:"wdth" 108,"wght" 650;letter-spacing:-.028em}
 
 
 /* See it on a model */
