@@ -179,7 +179,7 @@
           var seg = x.v.ImageSegmenter.createFromOptions(x.files, { baseOptions: { modelAssetPath: SEG_MODEL, delegate: 'GPU' }, runningMode: mode, outputCategoryMask: true, outputConfidenceMasks: false })
             .catch(function () { return null; });  // without it, the garment is drawn over the body instead
           return Promise.all([pose, seg]);
-        }).then(function (r) { landmarker = r[0]; segmenter = r[1]; say(''); return landmarker; });
+        }).then(function (r) { landmarker = r[0]; segmenter = r[1]; if (msg.textContent === tr('Loading the body-tracking model…')) say(''); return landmarker; });  // another message (e.g. the camera was refused) stays
         loading.catch(function () { loading = null; });
       }
       return loading.then(function (l) {
@@ -343,12 +343,25 @@
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return say(tr('This browser cannot open the camera. Try uploading a photo.'));
       // The computer's webcam on a laptop, the front camera on a phone; "Switch camera" goes to the back one.
       st.mode = 'camera'; smooth = []; lastPoses = []; hasMask = false; lastVideoTime = -1;
-      var ticket = ++camTicket;  // a second tap while the camera is still opening wins; the first one is closed
-      Promise.all([navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, width: { ideal: 640 }, height: { ideal: 480 } }, audio: false }), loadModel('VIDEO')]).then(function (r) {
-        if (st.mode !== 'camera' || ticket !== camTicket) { r[0].getTracks().forEach(function (t) { t.stop(); }); return; }
+      var ticket = ++camTicket, failed = false, opened = null;  // a second tap while the camera is still opening wins; the first one is closed
+      // The camera and the tracking model load side by side. If either fails, a camera that did open (before or after
+      // the failure) is closed again, so its light never stays on behind an error message.
+      var cam = navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, width: { ideal: 640 }, height: { ideal: 480 } }, audio: false })
+        .then(function (s) { opened = s; if (failed) dropStream(s); return s; });
+      var pose = loadModel('VIDEO').catch(function () { throw { model: true }; });
+      Promise.all([cam, pose]).then(function (r) {
+        if (st.mode !== 'camera' || ticket !== camTicket) { dropStream(r[0]); return; }
         stopCamera(); stream = r[0]; video.srcObject = stream; showTry(true); return video.play().then(function () { loop(r[1]); });
-      }).catch(function (e) { say(/denied|NotAllowed/i.test(String(e && e.name || e)) ? tr('Camera permission was denied. You can upload a photo instead.') : tr('The camera could not start. You can upload a photo instead.')); });
+      }).catch(function (e) {
+        failed = true;
+        if (opened && opened === stream) stopCamera(); else dropStream(opened);
+        if (st.mode !== 'camera' || ticket !== camTicket) return;  // the visitor has moved on, or tapped again: nothing to say
+        say(e && e.model ? tr('The body-tracking model could not load. Check your connection.')
+          : /denied|NotAllowed/i.test(String(e && e.name || e)) ? tr('Camera permission was denied. You can upload a photo instead.')
+          : tr('The camera could not start. You can upload a photo instead.'));
+      });
     }
+    function dropStream(s) { if (s) s.getTracks().forEach(function (t) { t.stop(); }); }
     function loop(l) {
       if (st.mode !== 'camera') return;
       var vw = video.videoWidth, vh = video.videoHeight;
