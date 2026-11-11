@@ -396,6 +396,7 @@
         loadModel('IMAGE').then(function () { if (st.mode !== 'photo' || st.photo !== img) return; say(drawPhoto() ? '' : tr('I could not find a person in this photo. Try one where the shoulders are visible.')); })
           .catch(function () { say(tr('The body-tracking model could not load. Check your connection.')); });
       };
+      img.onerror = function () { if (url) URL.revokeObjectURL(url); say(tr('This photo could not be opened. Try a JPG or PNG.')); };  // e.g. HEIC outside Safari
       var url = typeof file === 'string' ? null : URL.createObjectURL(file);
       img.src = url || file;
     }
@@ -849,6 +850,13 @@
       st.active = st.layers.length - 1;
     }
     function isText(L) { return !!(L && !L.logo && (L.text || L.kind === 'text')); }
+    // Removes a piece; the selection stays on the piece that was selected (or moves to the next one when that one goes)
+    // (an empty piece is left when the last one goes: "Clear drawing" can remove the only piece)
+    function removeLayer(i) {
+      st.layers.splice(i, 1); if (i < st.active) st.active--;
+      if (!st.layers.length) st.layers.push({ logo: null, text: '', size: .36, pos: { x: .5, y: .34 }, side: 'front', font: 'Archivo', tcolor: 'auto' });
+      st.active = Math.max(0, Math.min(st.active, st.layers.length - 1));
+    }
     // Your logos: each one on the front or the back, up to six; the controls below edit the one that is selected
     var layersEl = document.getElementById('toLayers'), sideEl = document.getElementById('toSide');
     function syncLogoUI() {
@@ -874,7 +882,7 @@
         b.onclick = function () { st.active = i; syncLogoUI(); showSide(); };
         if (st.layers.length > 1) {
           var x = document.createElement('span'); x.className = 'to-layer-x'; x.textContent = '×'; x.setAttribute('role', 'button'); x.setAttribute('aria-label', tr('Remove'));
-          x.onclick = function (e) { e.stopPropagation(); st.layers.splice(i, 1); st.active = Math.min(st.active, st.layers.length - 1); syncLogoUI(); redraw(); };
+          x.onclick = function (e) { e.stopPropagation(); removeLayer(i); syncLogoUI(); redraw(); };
           b.appendChild(x);
         }
         layersEl.appendChild(b);
@@ -907,7 +915,17 @@
     sideEl.onclick = function (e) { var b = e.target.closest('[data-side]'); if (!b) return; var to = b.getAttribute('data-side'); if (to !== st.side && Math.abs(st.pos.x - .5) > .1) st.pos = { x: .5, y: st.pos.y };  /* a chest-pocket piece moved to the other side starts centred */ st.side = to; syncLogoUI(); showSide(); redraw(); };
     onLang.push(renderLayers); renderLayers();
     document.querySelectorAll('#toType [data-type]').forEach(function (b) { b.onclick = function () { st.type = b.getAttribute('data-type'); document.querySelectorAll('#toType button').forEach(function (x) { x.classList.toggle('on', x === b); }); markSkins(); redraw(); }; });
-    document.getElementById('toLogo').onchange = function (e) { var f = e.target.files[0]; if (!f) return; if (isText(st.layers[st.active]) && st.layers.length < 6) { newLayer('logo'); syncLogoUI(); } var im = new Image(), u = URL.createObjectURL(f), L = st.layers[st.active]; im.onload = function () { L.logo = im; L.text = ''; syncLogoUI(); redraw(); }; im.src = u; };
+    document.getElementById('toLogo').onchange = function (e) {
+      var f = e.target.files[0]; e.target.value = ''; if (!f) return;  // cleared, so the same file can be chosen again
+      var im = new Image(), u = URL.createObjectURL(f);
+      im.onload = function () {
+        URL.revokeObjectURL(u);  // the loaded picture stays drawable
+        if (isText(st.layers[st.active]) && st.layers.length < 6) newLayer('logo');  // a new piece only once the file has opened
+        var L = st.layers[st.active]; L.logo = im; L.text = ''; syncLogoUI(); redraw();
+      };
+      im.onerror = function () { URL.revokeObjectURL(u); say(tr('This image could not be opened. Try a PNG, JPG or SVG.')); };
+      im.src = u;
+    };
 
     // ---------- "Create a logo with AI": a description becomes a logo, kept in this visitor's browser ----------
     // The AI is asked for a flat logo on plain white; the white that touches the edges is then made transparent, so the
@@ -978,14 +996,15 @@
     function idbDo(mode, fn) { return idb().then(function (db) { return new Promise(function (ok, no) { var t = db.transaction('logos', mode), s = t.objectStore('logos'), q = fn(s); t.oncomplete = function () { ok(q && q.result); }; t.onerror = no; }); }); }
     function addMine(rec, select) {
       var im = new Image(), b = document.createElement('button'); b.type = 'button'; b.className = 'mine'; b.title = rec.desc; b.setAttribute('aria-label', tr('Your logo') + ': ' + rec.desc);
-      im.src = URL.createObjectURL(rec.blob); var thumb = new Image(); thumb.src = im.src; b.appendChild(thumb); b._img = im;
+      im.src = b._url = URL.createObjectURL(rec.blob); var thumb = new Image(); thumb.src = im.src; b.appendChild(thumb); b._img = im;  // the URL is released with the button (dropMine)
       var x = document.createElement('span'); x.className = 'x'; x.textContent = '×'; x.setAttribute('role', 'button'); x.setAttribute('aria-label', tr('Remove'));
-      x.onclick = function (e) { e.stopPropagation(); b.remove(); myLogos = myLogos.filter(function (m) { return m.id !== rec.id; }); idbDo('readwrite', function (s) { s.delete(rec.id); }).catch(function () {}); st.layers.forEach(function (L) { if (L.logo === im) L.logo = sampleImgs[0]; }); syncLogoUI(); redraw(); };
+      x.onclick = function (e) { e.stopPropagation(); dropMine(b); myLogos = myLogos.filter(function (m) { return m.id !== rec.id; }); idbDo('readwrite', function (s) { s.delete(rec.id); }).catch(function () {}); st.layers.forEach(function (L) { if (L.logo === im) L.logo = sampleImgs[0]; }); syncLogoUI(); redraw(); };
       b.appendChild(x);
       b.onclick = function () { if (isText(st.layers[st.active]) && st.layers.length < 6) newLayer('logo'); st.logo = im; st.text = ''; syncLogoUI(); im.decode ? im.decode().then(redraw, redraw) : redraw(); };
       logos.appendChild(b); myLogos.push(rec);
       if (select) { im.onload = function () { b.onclick(); }; }
     }
+    function dropMine(b) { b.remove(); if (b._url) URL.revokeObjectURL(b._url); }  // a logo already on the garment stays drawn: it is loaded
     idbDo('readonly', function (s) { return s.getAll(); }).then(function (all) { (all || []).sort(function (a, b) { return a.id - b.id; }).forEach(function (r) { addMine(r, false); }); }).catch(function () {});
     aiGo.onclick = function () {
       var desc = aiDesc.value.trim(); if (desc.length < 3) { aiSay(tr('Write a few words: the name, the style and the colors.')); aiDesc.focus(); return; }
@@ -995,7 +1014,7 @@
         return new Promise(function (ok) { t.toBlob(ok, 'image/png'); });
       }).then(function (blob) {
         var rec = { id: Date.now(), desc: desc, blob: blob };
-        if (myLogos.length >= MY_MAX) { var old = myLogos[0], ob = logos.querySelector('button.mine'); if (ob) ob.remove(); myLogos.shift(); idbDo('readwrite', function (s) { s.delete(old.id); }).catch(function () {}); }
+        if (myLogos.length >= MY_MAX) { var old = myLogos[0], ob = logos.querySelector('button.mine'); if (ob) dropMine(ob); myLogos.shift(); idbDo('readwrite', function (s) { s.delete(old.id); }).catch(function () {}); }
         addMine(rec, true); idbDo('readwrite', function (s) { s.put(rec); }).catch(function () {});
         var stage = canvas.getBoundingClientRect(); if (stage.bottom < 60 || stage.top > innerHeight - 60) canvas.scrollIntoView({ behavior: 'smooth', block: 'center' });  // on a phone the shirt is above the box: show it
         aiSay(AI_LOGO_LIVE ? tr('Done: your logo is on the shirt. Choose front or back, size and position.') : tr('Preview logo (the AI is not switched on yet): this is how yours will appear.'));
@@ -1036,10 +1055,10 @@
     document.getElementById('toFlip').onclick = function () { facing = facing === 'user' ? 'environment' : 'user'; stopCamera(); startCamera(); };
     document.getElementById('toPhoto').onchange = function (e) { if (e.target.files[0]) tryPhoto(e.target.files[0]); e.target.value = ''; };
     document.getElementById('toSave').onclick = function () {
-      function save(href) { var a = document.createElement('a'); a.href = href; a.download = 'try-it-on.png'; document.body.appendChild(a); a.click(); a.remove(); }
-      if (st.aiUrl) return save(st.aiUrl);  // the AI photo when there is one, otherwise the instant preview
+      function save(href, ext) { var a = document.createElement('a'); a.href = href; a.download = 'try-it-on.' + ext; document.body.appendChild(a); a.click(); a.remove(); }
+      if (st.aiUrl) { var m = /^data:image\/(\w+)/.exec(st.aiUrl); return save(st.aiUrl, !m ? 'png' : m[1] === 'jpeg' ? 'jpg' : m[1]); }  // the AI photo when there is one (a JPEG when it was flipped back), otherwise the instant preview
       if (st.mode === 'model') return;  // the model photo is still being made
-      canvas.toBlob(function (b) { var u = URL.createObjectURL(b); save(u); setTimeout(function () { URL.revokeObjectURL(u); }, 4000); });
+      canvas.toBlob(function (b) { if (!b) return; var u = URL.createObjectURL(b); save(u, 'png'); setTimeout(function () { URL.revokeObjectURL(u); }, 4000); }, 'image/png');
     };
     function redraw() { if (st.mode === '3d') update3d(); else if (st.mode === 'design') drawDesign(); else if (st.mode === 'avatar') drawAvatar(); else if (st.mode === 'photo' && st.photo) tryPhoto.redo(); }
     // Drag the logo in the design view
@@ -1055,6 +1074,7 @@
       st.pos.x = Math.max(0, Math.min(1, drag.px + (x - drag.x) / c[2])); st.pos.y = Math.max(0, Math.min(1, drag.py + (y - drag.y) / c[3])); drawDesign();
     });
     canvas.addEventListener('pointerup', function () { drag = null; });
+    canvas.addEventListener('pointercancel', function () { drag = null; });  // e.g. the browser took the touch for a scroll
     window.addEventListener('resize', function () { if (st.mode === 'design') drawDesign(); else if (st.mode === 'avatar') drawAvatar(); else if (st.mode === '3d') draw360(); });
 
 
@@ -1171,7 +1191,7 @@
     }
     brushColors();
     document.getElementById('toBSizes').onclick = function (e) { var b = e.target.closest('[data-b]'); if (!b) return; brush.size = +b.getAttribute('data-b'); this.querySelectorAll('button').forEach(function (x) { x.classList.toggle('on', x === b); }); };
-    document.getElementById('toClearDraw').onclick = function () { var i = paintLayer(viewSide(), false); if (i >= 0) { st.layers.splice(i, 1); st.active = Math.min(st.active, st.layers.length - 1); syncLogoUI(); redraw(); } };
+    document.getElementById('toClearDraw').onclick = function () { var i = paintLayer(viewSide(), false); if (i >= 0) { removeLayer(i); syncLogoUI(); redraw(); } };
     // from a point on the stage to a point of the drawing, through the same placement the 360° view uses for logos
     function toPaint(e, L) {
       var g = spin.geo; if (!g) return null;
