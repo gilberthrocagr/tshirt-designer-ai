@@ -111,14 +111,17 @@
       g.drawImage(logo, cx - w / 2, cy - h / 2, w, h);
       st.logoBox = [cx - w / 2, cy - h / 2, w, h];
     }
-    // The garment with its logo, in the 200 × 220 box (the caller sets the transform)
-    function drawGarment(g, withShadows) {
+    // One piece on the flat garment. Without the 360° photos a drawing is painted over the whole 200 × 220 box (that is
+    // the frame the brush uses then, see draw360Flat); with them it keeps the placement it always had.
+    function drawFlat(g, L) { if (L.kind === 'paint' && !has360()) g.drawImage(L.logo, 0, 0, 200, 220); else drawLogo(g); }
+    // The garment with its logo, in the 200 × 220 box (the caller sets the transform); the front unless side says 'back'
+    function drawGarment(g, withShadows, side) {
       var p = paths[st.type], sh = SHAPES[st.type];
       g.save();
       if (p.hood) { g.fillStyle = st.color; g.fill(p.hood); g.strokeStyle = 'rgba(0,0,0,.18)'; g.lineWidth = 1.2; g.stroke(p.hood); }
       g.fillStyle = st.color; g.fill(p.body);
       g.save(); g.clip(p.body);
-      eachLayer('front', function () { drawLogo(g); });
+      eachLayer(side || 'front', function (L) { drawFlat(g, L); });
       if (withShadows) { // soft folds so a flat colour reads as fabric
         var gr = g.createLinearGradient(0, 0, 200, 0);
         gr.addColorStop(0, 'rgba(0,0,0,.22)'); gr.addColorStop(.25, 'rgba(0,0,0,0)'); gr.addColorStop(.75, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,.22)');
@@ -141,14 +144,14 @@
       var vh = Math.min(window.innerHeight || 900, (window.screen && screen.height) || 900);
       stageFix = { w: w, h: Math.round(Math.max(340, Math.min(700, w * 1.1, vh - 205))) }; return stageFix.h;
     }
-    function drawDesign() {
+    function drawDesign(side) {
       var w = canvas.parentNode.clientWidth, h = stageHeight(w); size(w, h);
       var bg = ctx.createRadialGradient(w / 2, h * .4, 10, w / 2, h / 2, h * .7); bg.addColorStop(0, '#1b2740'); bg.addColorStop(1, '#0b111c');
       ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
       var s = Math.min(w * .82 / 200, h * .86 / 220); view = { s: s, ox: (w - 200 * s) / 2, oy: (h - 220 * s) / 2 + 6 };
       ctx.save(); ctx.translate(view.ox, view.oy); ctx.scale(s, s);
       ctx.shadowColor = 'rgba(0,0,0,.45)'; ctx.shadowBlur = 28; ctx.shadowOffsetY = 12;
-      drawGarment(ctx, true); ctx.restore();
+      drawGarment(ctx, true, side); ctx.restore();
     }
 
     // Try-on, live or on a photo. Two on-device models: one finds the body (shoulders, hips) and the other
@@ -460,7 +463,7 @@
     var model = { who: 'woman', skin: 'natural' }, CHILD = { girl: 1, boy: 1 }, modelBusy = false;  // one model photo at a time
     var skinsEl = document.getElementById('toSkin');
     SKINS.forEach(function (s) {
-      var b = document.createElement('button'); b.type = 'button'; b.style.setProperty('--c', s[1]); b.setAttribute('aria-label', s[0]); if (s[0] === model.skin) b.className = 'on';
+      var b = document.createElement('button'); b.type = 'button'; b.style.setProperty('--c', s[1]); b.dataset.skin = s[0]; b.setAttribute('aria-label', s[0]); if (s[0] === model.skin) b.className = 'on';
       b.onclick = function () { if (b.disabled) return; model.skin = s[0] === model.natural ? 'natural' : s[0]; markSkins(); drawAvatar(); };
       skinsEl.appendChild(b);
     });
@@ -468,14 +471,20 @@
     // tones stay in view, struck through as "not available yet", until a real photo of that model exists in them
     // (named …-<tone>.webp on the media site).
     function tonesFor(name) { return SKINS.map(function (s) { return s[0]; }).filter(function (t) { return name && (MODEL_PHOTOS || []).indexOf(name + '-' + t) >= 0; }); }
+    // Without a photo of the model (the repository on its own has none) the drawn figure is shown instead, and it can
+    // take any tone: then every swatch is available, medium by default.
     function markSkins() {
       var z = sizing(), name = z.err || !MODEL_PHOTOS ? null : baseName(z), have = tonesFor(name);  // MODEL_PHOTOS is set further down: nothing to show before
+      var drawn = !!MODEL_PHOTOS && (z.err ? !MODEL_PHOTOS.length : !name), nat = drawn ? 'medium' : model.natural;
+      if (drawn) have = SKINS.map(function (s) { return s[0]; });
       if (have.indexOf(model.skin) < 0) model.skin = 'natural';
+      if (drawn && model.skin === 'natural') model.skin = nat;  // the figure is drawn in this tone, and the AI photo is asked for it too
       skinsEl.querySelectorAll('button').forEach(function (b) {
-        var t = b.getAttribute('aria-label'), ok = t === model.natural || have.indexOf(t) >= 0;
+        var t = b.dataset.skin, ok = t === nat || have.indexOf(t) >= 0;
         b.disabled = !ok; b.classList.toggle('na', !ok); b.title = ok ? '' : tr('Not available yet');
-        b.classList.toggle('on', model.skin === 'natural' ? t === model.natural : t === model.skin);
+        b.classList.toggle('on', model.skin === 'natural' ? t === nat : t === model.skin);
       });
+      var note = document.querySelector('.to-skin-note'); if (note) note.hidden = drawn;  // "the model's own skin tone" is about the photos
     }
     var ageEl = document.getElementById('toAge'), hEl = document.getElementById('toHeight'), wEl = document.getElementById('toWeight'), hU = document.getElementById('toHUnit'), wU = document.getElementById('toWUnit');
     var DEFAULTS = { woman: [30, 165, 62], man: [32, 177, 78], girl: [8, 128, 26], boy: [8, 130, 27] };  // age, cm, kg
@@ -530,7 +539,8 @@
     }
     onLang.push(calc); calc();
 
-    // ---------- The virtual model: a drawn figure wearing the garment, redrawn as each choice changes ----------
+    // ---------- The drawn model: a figure wearing the garment, redrawn as each choice changes ----------
+    // Shown when there is no photo of the model (see drawAvatar).
     // Proportions follow the age (a child's head is bigger), the height (the figure stands against a 2 m scale)
     // and the weight (width from the body mass index); the garment, its colour and the logo are the current design.
     function drawAvatarDrawn() {
@@ -599,7 +609,7 @@
       ctx.save(); ctx.clip(path);
       if (withLogo) {  // the logo in the same place as on the design: the design's 200 × 220 box mapped onto this torso
         ctx.save(); var kx = tw / 116, ky = (hemY - shY) / 188; ctx.translate(cx, shY); ctx.scale(kx, ky); ctx.translate(-100, -24);
-        var keepBox = st.logoBox; drawLogo(ctx); st.logoBox = keepBox; ctx.restore();
+        var keepBox = st.logoBox; eachLayer('front', function (L) { drawFlat(ctx, L); }); st.logoBox = keepBox; ctx.restore();  // every front piece
       }
       var gr = ctx.createLinearGradient(cx - SW, 0, cx + SW, 0);
       gr.addColorStop(0, 'rgba(0,0,0,.28)'); gr.addColorStop(.3, 'rgba(0,0,0,0)'); gr.addColorStop(.7, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,.28)');
@@ -721,7 +731,8 @@
     }
     function drawAvatar() {
       var z = sizing(); if (z.err) return;
-      var name = baseName(z); if (!name) return;
+      var name = baseName(z);
+      if (!name) { avatarToken++; say(''); return drawAvatarDrawn(); }  // no photo of this model (e.g. the repository on its own): the drawn figure
       if (model.skin !== 'natural' && MODEL_PHOTOS.indexOf(name + '-' + model.skin) >= 0) name += '-' + model.skin;
       var stem = st.color === '#1E3A8A' && MODEL_PHOTOS.indexOf(name + '-blue') >= 0 ? name + '-blue' : name, token = ++avatarToken;
       if (!models[stem]) say(tr('Loading the model…'));
@@ -1039,6 +1050,9 @@
     // one angle to the next; the other half of the turn uses the same photos mirrored. Colour and logo are painted on,
     // and the garment is drawn at its real size for the chosen size (M is the reference).
     var PRODUCT_PHOTOS = window.PRODUCT_PHOTOS || [], products = {}, AV = window.ASSET_V ? '?v=' + window.ASSET_V : '';  // a version per build: a phone never mixes old cached files with new ones
+    // The site that hosts the photos lists them in window.PRODUCT_PHOTOS. Without them (the repository on its own) the
+    // view shows the drawn garment instead, front or back (draw360Flat).
+    function has360(type) { var t = type || st.type; return ['front', 'threequarter', 'side', 'back'].every(function (a) { return (PRODUCT_PHOTOS || []).indexOf('product-' + t + '-' + a) >= 0; }); }
     var FRAMES = [[0, 'front', false], [45, 'threequarter', false], [90, 'side', false], [180, 'back', false], [270, 'side', true], [315, 'threequarter', true]];
     var DIMS = { '2T': [11, 14], '3T': [12, 15], '4T': [13, 16], 'Youth XS': [14, 19], 'Youth S': [15.5, 20.5], 'Youth M': [17, 22], 'Youth L': [18.5, 24], 'Youth XL': [20, 26],
       XS: [16.5, 27], S: [18, 28], M: [20, 29], L: [22, 30], XL: [24, 31], '2XL': [26, 32], '3XL': [28, 33] };
@@ -1084,7 +1098,8 @@
     }
     function start3d() {
       var type = st.type, names = ['front', 'threequarter', 'side', 'back'].map(function (a) { return 'product-' + type + '-' + a; });
-      if (names.some(function (n) { return PRODUCT_PHOTOS.indexOf(n) < 0; })) return;
+      var sideBtn = views.querySelector('[data-view="1"]'); if (sideBtn) sideBtn.hidden = !has360(type);  // the drawn garment has no side view
+      if (!has360(type)) { spin.frames = null; spin.type = null; draw360(); return; }
       if (spin.type !== type) {
         spin.frames = null; spin.type = type; say(tr('Loading the 360° view…'));
         Object.keys(products).forEach(function (n) {  // free the other garments' layers: only one garment's views fit in an iPhone's canvas memory
@@ -1205,8 +1220,16 @@
       if (hex) setPicked(hex);
     }, true);
     var frameCv2 = document.createElement('canvas'), f2 = frameCv2.getContext('2d');
+    // No 360° photos: the drawn garment, the front or the back depending on where the view is turned. The brush paints in
+    // its 200 × 220 box, so spin.geo describes that box on screen (drawFlat lays a drawing over the same box).
+    function draw360Flat() {
+      var side = viewSide(), r = window.devicePixelRatio || 1;
+      drawDesign(side); spin.drawn = Date.now();
+      spin.geo = { ox: view.ox, oy: view.oy, gw: 200 * view.s * r, gh: 220 * view.s * r, dpr: r, view: side, mirror: false };
+    }
     function draw360() {
       if (st.mode !== '3d') return;
+      if (!has360()) return draw360Flat();
       var w = Math.round(canvas.parentNode.clientWidth), h = stageHeight(w), dpr = Math.min(3, window.devicePixelRatio || 1); if (canvas.width !== Math.round(w * dpr) || canvas.style.height !== h + 'px') size(w, h);
       var bg = ctx.createRadialGradient(w / 2, h * .42, 10, w / 2, h / 2, h * .8); bg.addColorStop(0, '#f3f4f6'); bg.addColorStop(1, '#d9dce1');
       ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
